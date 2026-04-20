@@ -1345,8 +1345,8 @@ export default function BloodDonorApp() {
             <div style={card}>
               <div style={{padding:"16px 22px",borderBottom:`1px solid ${BDR}`}}><div style={{fontSize:14,fontWeight:"700",color:MAR,fontFamily:AF}}>ℹ️ Application Info</div></div>
               <div style={{padding:22,fontSize:12,color:TX_S,lineHeight:2.1}}>
-                <div><strong style={{color:MAR}}>Organisation:</strong> Sadguru Shree Aniruddha Upasana Kendra, Wai</div>
-                <div><strong style={{color:MAR}}>Academy:</strong> Aniruddha's Academy of Disaster Management</div>
+                <div><strong style={{color:MAR}}>Organisation:</strong> ANIRUDDHA'S ACADEMY OF DISASTER MANAGEMENT</div>
+                <div><strong style={{color:MAR}}>Upasana Kendra:</strong> Sadguru Shree Aniruddha Upasana Kendra, Wai</div>
                 <div><strong style={{color:MAR}}>Camp:</strong> Mega Blood Donation Camp</div>
                 <div><strong style={{color:MAR}}>Records:</strong> {donors.length} · Next Sr.No: {nextSrNo}</div>
                 <div><strong style={{color:MAR}}>Excel File:</strong> AADM_Shraddhavan_Donors_Data.xlsx</div>
