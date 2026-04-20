@@ -1,0 +1,18 @@
+directories:
+  output: dist
+  buildResources: assets
+files:
+  - filter:
+      - build/**/*
+      - build/**/*
+      - public/electron.js
+extraMetadata:
+  main: build/electron.js
+appId: com.aadm.blooddonor
+productName: Aniruddha's Academy of Disaster Management - Mega Blood Donation Camp
+icon: public/icon.ico
+win:
+  icon: public/icon.ico
+  target: nsis
+extends: react-cra
+electronVersion: 41.2.1
