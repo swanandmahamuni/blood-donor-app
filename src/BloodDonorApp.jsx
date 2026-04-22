@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
+import { supabase } from './supabase';
 
 // ─── Saffron + Maroon Design Tokens ──────────────────────────────────────────
 const SAF = "#E8641A";
@@ -394,17 +395,44 @@ export default function BloodDonorApp() {
 
   // ── Boot ─────────────────────────────────────────────────────────────
   useEffect(() => {
+	const run = async () => {
     const log = [];
     setLoadStage(0);
-    const dr = sGet(SK.DONORS);
-    if (dr) {
-      try {
-        const d = JSON.parse(dr);
-        setDonors(d);
-        if (d.length > 0) setNextSrNo(Math.max(...d.map(x=>x.srNo||0))+1);
-        log.push(`✅ Donors: ${d.length} record(s) restored`);
-      } catch { log.push("⚠️ Donor data corrupted"); }
-    } else { log.push("ℹ️ Fresh start — no records yet"); }
+	try {
+	  const { data, error } = await supabase
+		.from('donors')
+		.select('*')
+		.order('sr_no', { ascending: true });
+
+	  if (error) throw error;
+
+	  if (data && data.length > 0) {
+		// Map database column names → camelCase app field names
+		const mapped = data.map(r => ({
+		  id:               r.id,
+		  srNo:             r.sr_no,
+		  shraddhavanaType: r.shraddhavana_type  || "",
+		  upasanaKendra:    r.upasana_kendra     || "",
+		  name:             r.name               || "",
+		  mobile:           r.mobile             || "",
+		  dob:              r.dob                || "",
+		  age:              r.age                || "",
+		  gender:           r.gender             || "",
+		  bloodGroup:       r.BLOOD_GROUPS       || "",
+		  status:           r.status             || "",
+		  rejectionReason:  r.rejection_reason   || "",
+		  registeredOn:     r.registered_on      || "",
+		  registeredAt:     r.registered_at      || "",
+		}));
+		setDonors(mapped);
+		setNextSrNo(Math.max(...mapped.map(x => x.srNo || 0)) + 1);
+		log.push(`✅ Donors: ${mapped.length} record(s) loaded from database`);
+	  } else {
+		log.push("ℹ️ No records yet in database");
+	  }
+	} catch (err) {
+	  log.push(`⚠️ Could not load donors: ${err.message}`);
+	}
 
     setLoadStage(1);
     const gi = sGet(SK.GAL_IDX);
@@ -442,14 +470,80 @@ export default function BloodDonorApp() {
       const dl = log.find(l=>l.includes("record"));
       if (dl) setTimeout(() => showToast(dl.replace(/[✅ℹ️⚠️] /g,""),"info"), 400);
     }, 400);
+	  };
+	  run();
   }, []);
+  
+  
+// ── Real-time: auto-refresh when another user adds/edits/deletes ──────
+useEffect(() => {
+  const channel = supabase
+    .channel('donors-realtime')
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'donors' },
+      async () => {
+        // Re-fetch all donors whenever anyone changes data
+        const { data } = await supabase
+          .from('donors')
+          .select('*')
+          .order('sr_no', { ascending: true });
+
+        if (data) {
+          const mapped = data.map(r => ({
+            id:               r.id,
+            srNo:             r.sr_no,
+            shraddhavanaType: r.shraddhavana_type  || "",
+            upasanaKendra:    r.upasana_kendra     || "",
+            name:             r.name               || "",
+            mobile:           r.mobile             || "",
+            dob:              r.dob                || "",
+            age:              r.age                || "",
+            gender:           r.gender             || "",
+            bloodGroup:       r.BLOOD_GROUPS       || "",
+            status:           r.status             || "",
+            rejectionReason:  r.rejection_reason   || "",
+            registeredOn:     r.registered_on      || "",
+            registeredAt:     r.registered_at      || "",
+          }));
+          setDonors(mapped);
+          if (mapped.length > 0)
+            setNextSrNo(Math.max(...mapped.map(x => x.srNo || 0)) + 1);
+        }
+      }
+    )
+    .subscribe();
+
+  return () => { supabase.removeChannel(channel); };
+}, []);  
+
+
+  // ── Always-fresh ref so interval callback never reads stale donors ──
+  const donorsRef = useRef(donors);
+  useEffect(() => { donorsRef.current = donors; }, [donors]);
+  const doBackupRef = useRef(null);
+  // point doBackupRef at latest doBackup on every render
+  useEffect(() => { doBackupRef.current = doBackup; });
 
   // ── Auto-backup timer ────────────────────────────────────────────────
+  // donors is NOT in dependency array — adding it would reset the timer
+  // on every donor change. Fresh data is always read via donorsRef.
   useEffect(() => {
+    // Fire one backup 5 seconds after app opens (if data exists)
+    const initial = setTimeout(() => {
+      if (donorsRef.current.length > 0 && doBackupRef.current) doBackupRef.current();
+    }, 5000);
+
+    // Then repeat at the user-chosen interval
     if (autoBkRef.current) clearInterval(autoBkRef.current);
-    autoBkRef.current = setInterval(() => { if (donors.length > 0) doBackup(); }, bkInterval*60*1000);
-    return () => { if (autoBkRef.current) clearInterval(autoBkRef.current); };
-  }, [bkInterval, donors]);
+    autoBkRef.current = setInterval(() => {
+      if (donorsRef.current.length > 0 && doBackupRef.current) doBackupRef.current();
+    }, bkInterval * 60 * 1000);
+
+    return () => {
+      clearTimeout(initial);
+      if (autoBkRef.current) clearInterval(autoBkRef.current);
+    };
+  }, [bkInterval]); // ← only bkInterval, NOT donors
 
   // ── Auto-save every 30s ──────────────────────────────────────────────
   useEffect(() => {
@@ -460,13 +554,19 @@ export default function BloodDonorApp() {
   }, [donors]);
 
   const doBackup = () => {
+    const currentDonors = donorsRef.current;
+    if (!currentDonors || currentDonors.length === 0) return;
     const ts = Date.now(), fname = bkFname();
-    const data = JSON.stringify({donors,exportedAt:nowDT(),backupFile:fname,version:"1.0"},null,2);
+    const data = JSON.stringify({donors:currentDonors,exportedAt:nowDT(),backupFile:fname,version:"1.0"},null,2);
     sSet(`bdms-backup-${ts}`, data);
     const allBk = Object.keys(localStorage).filter(k=>k.startsWith("bdms-backup-")).sort();
     while (allBk.length > 5) { sDel(allBk.shift()); }
     setStoredBks(Object.keys(localStorage).filter(k=>k.startsWith("bdms-backup-")).sort().reverse().slice(0,5));
-    try { const blob=new Blob([data],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=fname; a.click(); } catch {}
+    try {
+      const blob=new Blob([data],{type:"application/json"});
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=fname; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    } catch {}
     setLastBkTime(nowTs());
     setBkNotif({fname, time:nowTs()});
     setTimeout(() => setBkNotif(null), 8000);
@@ -474,13 +574,155 @@ export default function BloodDonorApp() {
 
   const showToast = (msg, type="success") => { setToast({msg,type}); setTimeout(()=>setToast(null),3800); };
 
-  const saveDonors = list => {
-    setDonors(list);
-    if (list.length > 0) setNextSrNo(Math.max(...list.map(x=>x.srNo||0))+1); else setNextSrNo(1);
-    const ok = sSet(SK.DONORS, JSON.stringify(list));
-    if (ok) { setSaveErr(false); setLastSaved(nowTs()); }
-    else { setSaveErr(true); showToast("⚠️ Save failed! Export a backup.","error"); }
-  };
+	const saveDonors = async (list) => {
+	  setDonors(list);
+	  if (list.length > 0) setNextSrNo(Math.max(...list.map(x=>x.srNo||0))+1);
+	  else setNextSrNo(1);
+	};
+
+	// Save a single new donor to Supabase
+	
+	const insertDonor = async (donor) => {
+	  // Build the row exactly as DB expects (no client-only id)
+	  const row = {
+		sr_no:             donor.srNo,
+		shraddhavana_type: donor.shraddhavanaType  || "",
+		upasana_kendra:    donor.upasanaKendra      || "",
+		name:              donor.name               || "",
+		mobile:            donor.mobile             || "",
+		dob:               donor.dob                || "",
+		age:               donor.age                || "",
+		gender:            donor.gender             || "",
+		BLOOD_GROUPS:      donor.bloodGroup         || "",
+		status:            donor.status             || "",
+		rejection_reason:  donor.rejectionReason    || "",
+		registered_on:     donor.registeredOn       || "",
+		registered_at:     donor.registeredAt       || "",
+	  };
+
+	  // Ask Supabase to return the inserted row(s)
+	  const { data, error } = await supabase
+		.from('donors')
+		.insert([row])
+		.select(); // .select() returns the inserted row(s)
+
+	  if (error) {
+		setSaveErr(true);
+		showToast("⚠️ Save to database failed!","error");
+		console.error('insertDonor error', error);
+		return null;
+	  }
+
+	  // data is an array of inserted rows; take the first
+	  const inserted = Array.isArray(data) && data.length > 0 ? data[0] : null;
+	  if (inserted) {
+		// Replace the temporary client entry in local state with the DB row
+		// Find index by sr_no or by the temporary id you used when adding to local list
+		setDonors(prev => prev.map(d => {
+		  // If you used a client-generated id (Date.now()) to identify the local item,
+		  // match it here. If you matched by srNo, adjust accordingly.
+		  if (d.id === donor.id || d.srNo === donor.srNo) {
+			// Map DB columns back to your app shape
+			return {
+			  id: inserted.id,
+			  srNo: inserted.sr_no,
+			  shraddhavanaType: inserted.shraddhavana_type || "",
+			  upasanaKendra: inserted.upasana_kendra || "",
+			  name: inserted.name || "",
+			  mobile: inserted.mobile || "",
+			  dob: inserted.dob || "",
+			  age: inserted.age || "",
+			  gender: inserted.gender || "",
+			  bloodGroup: inserted.BLOOD_GROUPS || "",
+			  status: inserted.status || "",
+			  rejectionReason: inserted.rejection_reason || "",
+			  registeredOn: inserted.registered_on || "",
+			  registeredAt: inserted.registered_at || "",
+			};
+		  }
+		  return d;
+		}));
+
+		setSaveErr(false);
+		setLastSaved(nowTs());
+		return inserted;
+	  } else {
+		// No inserted row returned — still mark as error
+		setSaveErr(true);
+		showToast("⚠️ Save succeeded but no row returned","error");
+		return null;
+	  }
+	};
+
+
+	// Update an existing donor in Supabase
+	
+		const updateDonor = async (donor) => {
+		  const row = {
+			shraddhavana_type: donor.shraddhavanaType  || "",
+			upasana_kendra:    donor.upasanaKendra      || "",
+			name:              donor.name               || "",
+			mobile:            donor.mobile             || "",
+			dob:               donor.dob                || "",
+			age:               donor.age                || "",
+			gender:            donor.gender             || "",
+			BLOOD_GROUPS:      donor.bloodGroup         || "",
+			status:            donor.status             || "",
+			rejection_reason:  donor.rejectionReason    || "",
+		  };
+
+		  // Request the updated row back from Supabase
+		  const { data, error } = await supabase
+			.from('donors')
+			.update(row)
+			.eq('id', donor.id)
+			.select();
+
+		  if (error) {
+			setSaveErr(true);
+			showToast("⚠️ Update failed!","error");
+			console.error('updateDonor error', error);
+			return null;
+		  }
+
+		  // data is an array of updated rows (usually one)
+		  const updated = Array.isArray(data) && data.length > 0 ? data[0] : null;
+		  if (updated) {
+			// Merge DB canonical values into local state
+			setDonors(prev => prev.map(d => d.id === donor.id ? {
+			  id: updated.id,
+			  srNo: updated.sr_no || d.srNo,
+			  shraddhavanaType: updated.shraddhavana_type || "",
+			  upasanaKendra: updated.upasana_kendra || "",
+			  name: updated.name || "",
+			  mobile: updated.mobile || "",
+			  dob: updated.dob || "",
+			  age: updated.age || "",
+			  gender: updated.gender || "",
+			  bloodGroup: updated.BLOOD_GROUPS || "",
+			  status: updated.status || "",
+			  rejectionReason: updated.rejection_reason || "",
+			  registeredOn: updated.registered_on || d.registeredOn,
+			  registeredAt: updated.registered_at || d.registeredAt,
+			} : d));
+
+			setSaveErr(false);
+			setLastSaved(nowTs());
+			return updated;
+		  } else {
+			// No rows updated (maybe id mismatch)
+			setSaveErr(true);
+			showToast("⚠️ Update did not affect any rows","error");
+			return null;
+		  }
+		};
+
+
+	// Delete a donor from Supabase
+	const deleteDonor = async (id) => {
+	  const { error } = await supabase.from('donors').delete().eq('id', id);
+	  if (error) showToast("⚠️ Delete failed!","error");
+	};
 
   const saveGallery = list => {
     setGallery(list);
@@ -502,20 +744,31 @@ export default function BloodDonorApp() {
     return null;
   };
 
-  const handleSubmit = () => {
-    const err = validate(); if (err) { showToast(err,"error"); return; }
-    if (editId) {
-      saveDonors(donors.map(d => d.id===editId ? {...form,id:editId,registeredAt:d.registeredAt,registeredOn:d.registeredOn} : d));
-      showToast("Record updated! ✅"); setEditId(null);
-    } else {
-      saveDonors([...donors, {...form, id:Date.now(), srNo:nextSrNo, registeredOn:todayStr(), registeredAt:nowDT()}]);
-      showToast("Shraddhavan registered! ✅");
-    }
-    setForm(INIT_FORM); setView("database");
-  };
+	const handleSubmit = async () => {
+	  const err = validate(); if (err) { showToast(err,"error"); return; }
+	  if (editId) {
+		const updated = {...form, id:editId};
+		const newList = donors.map(d => d.id===editId ? updated : d);
+		await saveDonors(newList);
+		await updateDonor(updated);
+		showToast("Record updated! ✅"); setEditId(null);
+	  } else {
+		const newDonor = {...form, id:Date.now(), srNo:nextSrNo, registeredOn:todayStr(), registeredAt:nowDT()};
+		const newList = [...donors, newDonor];
+		await saveDonors(newList);
+		await insertDonor(newDonor);
+		showToast("Shraddhavan registered! ✅");
+	  }
+	  setForm(INIT_FORM); setView("database");
+	};
 
   const handleEdit   = d => { setForm({...d}); setEditId(d.id); setView("add"); setActiveTab("form"); };
-  const handleDelete = id => { saveDonors(donors.filter(d=>d.id!==id)); setDelConfirm(null); showToast("Record removed.","info"); };
+  const handleDelete = async (id) => {
+  await deleteDonor(id);
+  saveDonors(donors.filter(d => d.id !== id));
+  setDelConfirm(null);
+  showToast("Record removed.","info");
+	};
   const handleSort   = f  => { if(sortField===f) setSortDir(d=>d==="asc"?"desc":"asc"); else { setSortField(f); setSortDir("asc"); } };
 
   const exportExcel = () => {
