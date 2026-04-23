@@ -505,7 +505,6 @@ export default function BloodDonorApp() {
   const [interact, setInteract] = useState(null);
   const [nextSrNo, setNextSrNo] = useState(1);
   const [showCelebration, setShowCelebration] = useState(false);
-  const [celebratedDonor, setCelebratedDonor] = useState(null);
   const [reward, setReward] = useState(null);
   const [bkInterval, setBkInterval] = useState(15);
   const [lastBkTime, setLastBkTime] = useState(null);
@@ -632,9 +631,12 @@ export default function BloodDonorApp() {
 
     // Then repeat at the user-chosen interval
     if (autoBkRef.current) clearInterval(autoBkRef.current);
-    autoBkRef.current = setInterval(() => { if (donors.length > 0) doBackup(); }, bkInterval * 60 * 1000);
-    return () => { if (autoBkRef.current) clearInterval(autoBkRef.current); };
-  }, [bkInterval, donors]);
+    autoBkRef.current = setInterval(() => { if (donorsRef.current.length > 0 && doBackupRef.current) doBackupRef.current(); }, bkInterval * 60 * 1000);
+    return () => {
+      clearTimeout(initial);
+      if (autoBkRef.current) clearInterval(autoBkRef.current);
+    };
+  }, [bkInterval]);
 
   // ── Auto-save every 30s ──────────────────────────────────────────────
   useEffect(() => {
@@ -698,7 +700,6 @@ export default function BloodDonorApp() {
       const newDonor = { ...form, id: Date.now(), srNo: nextSrNo, registeredOn: todayStr(), registeredAt: nowDT() };
       const newList = [...donors, newDonor];
       saveDonors(newList);
-      setCelebratedDonor(newDonor);
       setShowCelebration(true);
       showToast("Shraddhavan registered! ✅");
 
