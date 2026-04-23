@@ -10,7 +10,6 @@ const SAF_XL = "#FED7AA";
 const SAF_G = "rgba(232,100,26,0.3)";
 const MAR = "#7F1D1D";
 const MAR_M = "#991B1B";
-const MAR_L = "#B91C1C";
 const APP_BG = "#F7EFE3";
 const APP_BG2 = "#F2E6D4";
 const CARD_BG = "#FFFFFF";
@@ -19,7 +18,6 @@ const SB_BG2 = "#4D1010";
 const TX_P = "#2C0A04";
 const TX_S = "#6B2A10";
 const TX_M = "#A0522D";
-const TX_W = "rgba(245,203,167,0.9)";
 const TX_WM = "rgba(245,203,167,0.5)";
 const BDR = "rgba(139,60,20,0.12)";
 const BDR_H = "rgba(232,100,26,0.35)";
@@ -505,7 +503,7 @@ export default function BloodDonorApp() {
   const [interact, setInteract] = useState(null);
   const [nextSrNo, setNextSrNo] = useState(1);
   const [showCelebration, setShowCelebration] = useState(false);
-  const [celebratedDonor, setCelebratedDonor] = useState(null);
+  const [, setCelebratedDonor] = useState(null);
   const [reward, setReward] = useState(null);
   const [bkInterval, setBkInterval] = useState(15);
   const [lastBkTime, setLastBkTime] = useState(null);
@@ -626,15 +624,20 @@ export default function BloodDonorApp() {
   // on every donor change. Fresh data is always read via donorsRef.
   useEffect(() => {
     // Fire one backup 5 seconds after app opens (if data exists)
-    const initial = setTimeout(() => {
+    const initialTimer = setTimeout(() => {
       if (donorsRef.current.length > 0 && doBackupRef.current) doBackupRef.current();
     }, 5000);
 
     // Then repeat at the user-chosen interval
     if (autoBkRef.current) clearInterval(autoBkRef.current);
-    autoBkRef.current = setInterval(() => { if (donors.length > 0) doBackup(); }, bkInterval * 60 * 1000);
-    return () => { if (autoBkRef.current) clearInterval(autoBkRef.current); };
-  }, [bkInterval, donors]);
+    autoBkRef.current = setInterval(() => {
+      if (donorsRef.current.length > 0 && doBackupRef.current) doBackupRef.current();
+    }, bkInterval * 60 * 1000);
+    return () => {
+      clearTimeout(initialTimer);
+      if (autoBkRef.current) clearInterval(autoBkRef.current);
+    };
+  }, [bkInterval]);
 
   // ── Auto-save every 30s ──────────────────────────────────────────────
   useEffect(() => {
