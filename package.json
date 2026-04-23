@@ -7,6 +7,7 @@
   "description": "Aniruddhas Academy of Disaster Management Mega Blood Donation Camp",
   "author": "Swanandsinh Ashok Mahamuni & Priyaveera Hemant Khadsare",
   "dependencies": {
+    "@supabase/supabase-js": "^2.104.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -33,11 +34,17 @@
     "dist": "react-scripts build && electron-builder"
   },
   "build": {
-  "appId": "com.aadm.blooddonor",
-  "productName": "Aniruddha's Academy of Disaster Management - Mega Blood Donation Camp",
-  "icon": "public/icon.ico",
-  "files": ["build/**/*", "public/electron.js"],
-  "win": { "icon": "public/icon.ico", "target": "nsis" }
+    "appId": "com.aadm.blooddonor",
+    "productName": "Aniruddha's Academy of Disaster Management - Mega Blood Donation Camp",
+    "icon": "public/icon.ico",
+    "files": [
+      "build/**/*",
+      "public/electron.js"
+    ],
+    "win": {
+      "icon": "public/icon.ico",
+      "target": "nsis"
+    }
   },
   "eslintConfig": {
     "extends": [

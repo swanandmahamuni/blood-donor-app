@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
+import { supabase } from './supabase';
 
 // ─── Saffron + Maroon Design Tokens ──────────────────────────────────────────
 const SAF = "#E8641A";
@@ -33,11 +34,11 @@ const DEFAULT_LOGO = "/logo.png";
 const SADGURU_IMG = "/sadguru.jpg";
 
 const REWARDS = [
-  { count: 50,  id:'50',  color: "#FFD700", bg: "linear-gradient(135deg, #451a03, #92400e, #451a03)", text: "#FDE68A" },
-  { count: 100, id:'100', color: "#FFD700", bg: "linear-gradient(135deg, #451a03, #92400e, #451a03)", text: "#FDE68A" },
-  { count: 150, id:'150', color: "#FFD700", bg: "linear-gradient(135deg, #451a03, #92400e, #451a03)", text: "#FDE68A" },
-  { count: 200, id:'200', color: "#FFD700", bg: "linear-gradient(135deg, #451a03, #92400e, #451a03)", text: "#FDE68A" },
-  { count: 250, id:'250', color: "#FFD700", bg: "linear-gradient(135deg, #451a03, #92400e, #451a03)", text: "#FDE68A" },
+  { count: 50, id: '50', color: "#FFD700", bg: "linear-gradient(135deg, #451a03, #92400e, #451a03)", text: "#FDE68A" },
+  { count: 100, id: '100', color: "#FFD700", bg: "linear-gradient(135deg, #451a03, #92400e, #451a03)", text: "#FDE68A" },
+  { count: 150, id: '150', color: "#FFD700", bg: "linear-gradient(135deg, #451a03, #92400e, #451a03)", text: "#FDE68A" },
+  { count: 200, id: '200', color: "#FFD700", bg: "linear-gradient(135deg, #451a03, #92400e, #451a03)", text: "#FDE68A" },
+  { count: 250, id: '250', color: "#FFD700", bg: "linear-gradient(135deg, #451a03, #92400e, #451a03)", text: "#FDE68A" },
 ];
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
@@ -349,7 +350,7 @@ function CelebrationBurst() {
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 10000, overflow: "hidden" }}>
       {[...Array(80)].map((_, i) => {
-        const side = i % 4; 
+        const side = i % 4;
         const isLeft = side === 0 || side === 2;
         const delay = Math.random() * 0.5;
         const duration = 1.2 + Math.random() * 2.2;
@@ -366,8 +367,8 @@ function CelebrationBurst() {
             userSelect: "none",
             opacity: 0,
             animation: `celebrateBurst ${duration}s cubic-bezier(0.12, 0.88, 0.35, 1) ${delay}s forwards`,
-            "--tx": `${targetX}px`, 
-            "--ty": `${targetY}px`, 
+            "--tx": `${targetX}px`,
+            "--ty": `${targetY}px`,
             "--tr": `${targetRot}deg`
           }}>
             {emojis[i % emojis.length]}
@@ -392,56 +393,56 @@ function RewardModal({ reward, onClose }) {
   if (!reward) return null;
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 20000, backdropFilter: "blur(20px)", animation: "celebrateFadeIn 0.8s ease" }}>
-      <div style={{ 
-        background: reward.bg, 
-        border: `3px solid ${reward.color}80`, 
-        borderRadius: 40, 
-        padding: "50px", 
-        width: 500, 
-        maxWidth: "90vw", 
-        textAlign: "center", 
-        boxShadow: `0 0 80px rgba(217,119,6,0.4), 0 40px 120px rgba(0,0,0,0.9)`, 
-        position: "relative", 
-        overflow: "hidden", 
-        animation: "rewardPop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), goldenGlowPulse 3s infinite ease-in-out" 
+      <div style={{
+        background: reward.bg,
+        border: `3px solid ${reward.color}80`,
+        borderRadius: 40,
+        padding: "50px",
+        width: 500,
+        maxWidth: "90vw",
+        textAlign: "center",
+        boxShadow: `0 0 80px rgba(217,119,6,0.4), 0 40px 120px rgba(0,0,0,0.9)`,
+        position: "relative",
+        overflow: "hidden",
+        animation: "rewardPop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), goldenGlowPulse 3s infinite ease-in-out"
       }}>
-        
+
         <div style={{ position: "absolute", top: "-100%", left: "-100%", width: "300%", height: "300%", background: "linear-gradient(45deg, transparent 0%, rgba(255,255,255,0.05) 45%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0.05) 55%, transparent 100%)", animation: "rewardShine 4s infinite linear", zIndex: 0 }} />
 
         <div style={{ position: "relative", zIndex: 1 }}>
           <div style={{ fontSize: 110, fontWeight: "900", color: "#FFD700", fontFamily: AF, marginBottom: 5, lineHeight: 1, textShadow: "0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(255,215,0,0.4)", background: "linear-gradient(180deg, #FFF9C4 0%, #FFD700 50%, #D4AF37 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             {reward.count}
           </div>
-          
+
           <div style={{ fontSize: 16, fontWeight: "700", color: "#FDE68A", letterSpacing: 4, textTransform: "uppercase", marginBottom: 30, opacity: 0.8, fontFamily: SF }}>Collected Blood Bags</div>
 
           <div style={{ width: 200, height: 260, margin: "0 auto 30px", borderRadius: 24, boxShadow: "0 25px 60px rgba(0,0,0,0.5)", overflow: "hidden", border: "4px solid rgba(255,215,0,0.4)" }}>
-             <img src={SADGURU_IMG} alt="Sadguru" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img src={SADGURU_IMG} alt="Sadguru" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
 
-          <div style={{ 
-            fontSize: 48, 
-            fontWeight: "900", 
+          <div style={{
+            fontSize: 48,
+            fontWeight: "900",
             background: "linear-gradient(180deg, #FFF9C4 0%, #FFD700 45%, #D4AF37 55%, #8B4513 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
-            fontFamily: AF, 
-            marginBottom: 2, 
-            letterSpacing: 1, 
+            fontFamily: AF,
+            marginBottom: 2,
+            letterSpacing: 1,
             filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.8))"
           }}>हरि ॐ श्रीराम</div>
-          <div style={{ 
-            fontSize: 34, 
-            fontWeight: "900", 
+          <div style={{
+            fontSize: 34,
+            fontWeight: "900",
             background: "linear-gradient(180deg, #FFF9C4 0%, #FFD700 45%, #D4AF37 55%, #8B4513 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
-            fontFamily: AF, 
-            marginBottom: 40, 
-            letterSpacing: 1, 
+            fontFamily: AF,
+            marginBottom: 40,
+            letterSpacing: 1,
             filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.8))"
           }}>अंबज्ञ नाथसंविध</div>
-          
+
           <button onClick={onClose} style={{ background: "linear-gradient(135deg, #FFD700, #D4AF37)", color: "#451a03", border: "none", borderRadius: 18, padding: "18px 56px", fontSize: 18, fontWeight: "900", cursor: "pointer", boxShadow: "0 15px 30px rgba(0,0,0,0.3)", transition: "all 0.3s", fontFamily: SF }} onMouseEnter={e => { e.target.style.transform = "scale(1.05) translateY(-2px)"; e.target.style.boxShadow = "0 20px 40px rgba(0,0,0,0.4)"; }} onMouseLeave={e => { e.target.style.transform = "scale(1)"; e.target.style.boxShadow = "0 15px 30px rgba(0,0,0,0.3)"; }}>Hari Om!</button>
         </div>
       </div>
@@ -517,58 +518,119 @@ export default function BloodDonorApp() {
 
   // ── Boot ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    const log = [];
-    setLoadStage(0);
-    const dr = sGet(SK.DONORS);
-    if (dr) {
-      try {
-        const d = JSON.parse(dr);
-        setDonors(d);
-        if (d.length > 0) setNextSrNo(Math.max(...d.map(x => x.srNo || 0)) + 1);
-        log.push(`✅ Donors: ${d.length} record(s) restored`);
-      } catch { log.push("⚠️ Donor data corrupted"); }
-    } else { log.push("ℹ️ Fresh start — no records yet"); }
+    const run = async () => {
+      const log = [];
+      setLoadStage(0);
+      const dr = sGet(SK.DONORS);
+      if (dr) {
+        try {
+          const d = JSON.parse(dr);
+          setDonors(d);
+          if (d.length > 0) setNextSrNo(Math.max(...d.map(x => x.srNo || 0)) + 1);
+          log.push(`✅ Donors: ${d.length} record(s) restored`);
+        } catch { log.push("⚠️ Donor data corrupted"); }
+      } else { log.push("ℹ️ Fresh start — no records yet"); }
 
-    setLoadStage(1);
-    const gi = sGet(SK.GAL_IDX);
-    if (gi) {
-      try {
-        const idx = JSON.parse(gi);
-        const full = idx.map(m => { const src = sGet(galKey(m.id)); return { ...m, src: src || null }; });
-        setGallery(full);
-        log.push(`✅ Gallery: ${full.length} image(s) restored`);
-      } catch { log.push("⚠️ Gallery data corrupted"); }
-    }
+      setLoadStage(1);
+      const gi = sGet(SK.GAL_IDX);
+      if (gi) {
+        try {
+          const idx = JSON.parse(gi);
+          const full = idx.map(m => { const src = sGet(galKey(m.id)); return { ...m, src: src || null }; });
+          setGallery(full);
+          log.push(`✅ Gallery: ${full.length} image(s) restored`);
+        } catch { log.push("⚠️ Gallery data corrupted"); }
+      }
 
-    setLoadStage(2);
-    const bgR = sGet(SK.BG); if (bgR) setBg(bgR);
-    const opR = sGet(SK.OPACITY); if (opR) setBgOpacity(parseFloat(opR));
-    const biR = sGet(SK.BANNER_IMG); if (biR) setBannerImg(biR);
-    const boR = sGet(SK.BANNER_OPACITY); if (boR) setBannerOp(parseFloat(boR));
-    const bnR = sGet(SK.BANNER_ICON); if (bnR) setBannerIcon(bnR);
-    const siR = sGet(SK.SIDEBAR_ICON); if (siR) setSidebarIcon(siR);
-    const sdR = sGet(SK.SIDEBAR_DECOR); if (sdR) setSidebarDecorImg(sdR);
-    const sdOp = sGet(SK.SIDEBAR_DECOR_OP); if (sdOp) setSidebarDecorOp(parseFloat(sdOp));
-    const sdX = sGet(SK.SIDEBAR_DECOR_X); if (sdX) setSidebarDecorX(parseFloat(sdX));
-    const sdY = sGet(SK.SIDEBAR_DECOR_Y); if (sdY) setSidebarDecorY(parseFloat(sdY));
-    const sdSc = sGet(SK.SIDEBAR_DECOR_SC); if (sdSc) setSidebarDecorSc(parseFloat(sdSc));
-    const bkR = sGet(SK.BACKUP_INTERVAL); if (bkR) setBkInterval(parseInt(bkR) || 15);
-    const soR = sGet(SK.SIDEBAR_OPEN); if (soR !== null) setSidebarOpen(soR === "true");
-    const bks = Object.keys(localStorage).filter(k => k.startsWith("bdms-backup-")).sort().reverse().slice(0, 5);
-    setStoredBks(bks);
-    log.push("✅ Settings restored");
+      setLoadStage(2);
+      const bgR = sGet(SK.BG); if (bgR) setBg(bgR);
+      const opR = sGet(SK.OPACITY); if (opR) setBgOpacity(parseFloat(opR));
+      const biR = sGet(SK.BANNER_IMG); if (biR) setBannerImg(biR);
+      const boR = sGet(SK.BANNER_OPACITY); if (boR) setBannerOp(parseFloat(boR));
+      const bnR = sGet(SK.BANNER_ICON); if (bnR) setBannerIcon(bnR);
+      const siR = sGet(SK.SIDEBAR_ICON); if (siR) setSidebarIcon(siR);
+      const sdR = sGet(SK.SIDEBAR_DECOR); if (sdR) setSidebarDecorImg(sdR);
+      const sdOp = sGet(SK.SIDEBAR_DECOR_OP); if (sdOp) setSidebarDecorOp(parseFloat(sdOp));
+      const sdX = sGet(SK.SIDEBAR_DECOR_X); if (sdX) setSidebarDecorX(parseFloat(sdX));
+      const sdY = sGet(SK.SIDEBAR_DECOR_Y); if (sdY) setSidebarDecorY(parseFloat(sdY));
+      const sdSc = sGet(SK.SIDEBAR_DECOR_SC); if (sdSc) setSidebarDecorSc(parseFloat(sdSc));
+      const bkR = sGet(SK.BACKUP_INTERVAL); if (bkR) setBkInterval(parseInt(bkR) || 15);
+      const soR = sGet(SK.SIDEBAR_OPEN); if (soR !== null) setSidebarOpen(soR === "true");
+      const bks = Object.keys(localStorage).filter(k => k.startsWith("bdms-backup-")).sort().reverse().slice(0, 5);
+      setStoredBks(bks);
+      log.push("✅ Settings restored");
 
-    setLoadStage(3);
-    setTimeout(() => {
-      setRestLog(log);
-      setAppReady(true);
-      const dl = log.find(l => l.includes("record"));
-      if (dl) setTimeout(() => showToast(dl.replace(/[✅ℹ️⚠️] /g, ""), "info"), 400);
-    }, 400);
+      setLoadStage(3);
+      setTimeout(() => {
+        setRestLog(log);
+        setAppReady(true);
+        const dl = log.find(l => l.includes("record"));
+        if (dl) setTimeout(() => showToast(dl.replace(/[✅ℹ️⚠️] /g, ""), "info"), 400);
+      }, 400);
+    };
+    run();
   }, []);
 
-  // ── Auto-backup timer ────────────────────────────────────────────────
+
+  // ── Real-time: auto-refresh when another user adds/edits/deletes ──────
   useEffect(() => {
+    const channel = supabase
+      .channel('donors-realtime')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'donors' },
+        async () => {
+          // Re-fetch all donors whenever anyone changes data
+          const { data } = await supabase
+            .from('donors')
+            .select('*')
+            .order('sr_no', { ascending: true });
+
+          if (data) {
+            const mapped = data.map(r => ({
+              id: r.id,
+              srNo: r.sr_no,
+              shraddhavanaType: r.shraddhavana_type || "",
+              upasanaKendra: r.upasana_kendra || "",
+              name: r.name || "",
+              mobile: r.mobile || "",
+              dob: r.dob || "",
+              age: r.age || "",
+              gender: r.gender || "",
+              bloodGroup: r.BLOOD_GROUPS || "",
+              status: r.status || "",
+              rejectionReason: r.rejection_reason || "",
+              registeredOn: r.registered_on || "",
+              registeredAt: r.registered_at || "",
+            }));
+            setDonors(mapped);
+            if (mapped.length > 0)
+              setNextSrNo(Math.max(...mapped.map(x => x.srNo || 0)) + 1);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+
+  // ── Always-fresh ref so interval callback never reads stale donors ──
+  const donorsRef = useRef(donors);
+  useEffect(() => { donorsRef.current = donors; }, [donors]);
+  const doBackupRef = useRef(null);
+  // point doBackupRef at latest doBackup on every render
+  useEffect(() => { doBackupRef.current = doBackup; });
+
+  // ── Auto-backup timer ────────────────────────────────────────────────
+  // donors is NOT in dependency array — adding it would reset the timer
+  // on every donor change. Fresh data is always read via donorsRef.
+  useEffect(() => {
+    // Fire one backup 5 seconds after app opens (if data exists)
+    const initial = setTimeout(() => {
+      if (donorsRef.current.length > 0 && doBackupRef.current) doBackupRef.current();
+    }, 5000);
+
+    // Then repeat at the user-chosen interval
     if (autoBkRef.current) clearInterval(autoBkRef.current);
     autoBkRef.current = setInterval(() => { if (donors.length > 0) doBackup(); }, bkInterval * 60 * 1000);
     return () => { if (autoBkRef.current) clearInterval(autoBkRef.current); };
@@ -583,6 +645,8 @@ export default function BloodDonorApp() {
   }, [donors]);
 
   const doBackup = () => {
+    const currentDonors = donorsRef.current;
+    if (!currentDonors || currentDonors.length === 0) return;
     const ts = Date.now(), fname = bkFname();
     const data = JSON.stringify({ donors, exportedAt: nowDT(), backupFile: fname, version: "1.0" }, null, 2);
     sSet(`bdms-backup-${ts}`, data);
@@ -630,23 +694,11 @@ export default function BloodDonorApp() {
     if (editId) {
       saveDonors(donors.map(d => d.id === editId ? { ...form, id: editId, registeredAt: d.registeredAt, registeredOn: d.registeredOn } : d));
       showToast("Record updated! ✅"); setEditId(null);
-      setView("database");
     } else {
-      const newDonor = { ...form, id: Date.now(), srNo: nextSrNo, registeredOn: todayStr(), registeredAt: nowDT() };
-      const newList = [...donors, newDonor];
-      saveDonors(newList);
-      setCelebratedDonor(newDonor);
-      setShowCelebration(true);
+      saveDonors([...donors, { ...form, id: Date.now(), srNo: nextSrNo, registeredOn: todayStr(), registeredAt: nowDT() }]);
       showToast("Shraddhavan registered! ✅");
-
-      // Check Reward
-      const r = REWARDS.find(x => newList.length === x.count);
-      if (r) setReward(r);
-
-      setView("database");
-      setTimeout(() => setShowCelebration(false), 5500);
     }
-    setForm(INIT_FORM);
+    setForm(INIT_FORM); setView("database");
   };
 
   const handleEdit = d => { setForm({ ...d }); setEditId(d.id); setView("add"); setActiveTab("form"); };
@@ -1050,21 +1102,21 @@ export default function BloodDonorApp() {
                   <svg width="120" height="120" viewBox="0 0 120 120" style={{ position: "relative", zIndex: 2 }}>
                     <defs>
                       <filter id="glow">
-                        <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+                        <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
                         <feMerge>
-                          <feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/>
+                          <feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" />
                         </feMerge>
                       </filter>
                     </defs>
                     {/* Fast Entry Animation Slices Group */}
                     <g style={{ animation: "chartEntry 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards", transformOrigin: "60px 60px" }}>
                       {slices.map((s, i) => s.val > 0 && (
-                        <path 
-                          key={i} 
-                          d={s.pathD} 
-                          fill={s.color} 
+                        <path
+                          key={i}
+                          d={s.pathD}
+                          fill={s.color}
                           className="donut-slice"
-                          style={{ 
+                          style={{
                             opacity: hoveredGender && hoveredGender !== s.label ? 0.3 : 0.9,
                             transform: hoveredGender === s.label ? "scale(1.1)" : "scale(1)",
                             transformOrigin: "60px 60px",
@@ -1084,16 +1136,16 @@ export default function BloodDonorApp() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {Object.entries(stats.byGender).map(([g, c]) => (
-                    <div 
-                      key={g} 
+                    <div
+                      key={g}
                       onMouseEnter={() => setHoveredGender(g)}
                       onMouseLeave={() => setHoveredGender(null)}
-                      style={{ 
-                        display: "flex", 
-                        alignItems: "center", 
-                        gap: 8, 
-                        padding: "6px 10px", 
-                        borderRadius: 8, 
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "6px 10px",
+                        borderRadius: 8,
                         background: hoveredGender === g ? `${GEN_C[g]}15` : "transparent",
                         transition: "all 0.2s",
                         cursor: "pointer"
