@@ -4,6 +4,9 @@
   "name": "aniruddhas-acaademy-of-disaster-management-mega-blood-donation-camp",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "18.x"
+  },
   "description": "Aniruddhas Academy of Disaster Management Mega Blood Donation Camp",
   "author": "Swanandsinh Ashok Mahamuni & Priyaveera Hemant Khadsare",
   "dependencies": {

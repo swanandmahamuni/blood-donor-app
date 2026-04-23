@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from './supabase';
 
@@ -10,7 +10,7 @@ const SAF_XL = "#FED7AA";
 const SAF_G = "rgba(232,100,26,0.3)";
 const MAR = "#7F1D1D";
 const MAR_M = "#991B1B";
-//const MAR_L = "#B91C1C";
+// const MAR_L = "#B91C1C";   // reserved — not currently used
 const APP_BG = "#F7EFE3";
 const APP_BG2 = "#F2E6D4";
 const CARD_BG = "#FFFFFF";
@@ -19,7 +19,7 @@ const SB_BG2 = "#4D1010";
 const TX_P = "#2C0A04";
 const TX_S = "#6B2A10";
 const TX_M = "#A0522D";
-//const TX_W = "rgba(245,203,167,0.9)";
+// const TX_W = "rgba(245,203,167,0.9)";  // reserved — not currently used
 const TX_WM = "rgba(245,203,167,0.5)";
 const BDR = "rgba(139,60,20,0.12)";
 const BDR_H = "rgba(232,100,26,0.35)";
@@ -97,7 +97,44 @@ const bkFname = () => {
   return `MBDC_Backup_${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}_${String(t.getHours()).padStart(2, '0')}-${String(t.getMinutes()).padStart(2, '0')}.json`;
 };
 
-// ─── Donut slice helper (no JSX, returns path data only) ─────────────────
+// ─── Supabase row ↔ app object mappers ────────────────────────────────────
+// Converts a Supabase DB row → app donor object
+const fromSupabaseRow = r => ({
+  id: r.id,
+  srNo: r.sr_no,
+  shraddhavanaType: r.shraddhavana_type || "",
+  upasanaKendra: r.upasana_kendra || "",
+  name: r.name || "",
+  mobile: r.mobile || "",
+  dob: r.dob || "",
+  age: r.age || "",
+  gender: r.gender || "",
+  bloodGroup: r.blood_group || "",   // ← fixed: was r.BLOOD_GROUPS (wrong constant name)
+  status: r.status || "",
+  rejectionReason: r.rejection_reason || "",
+  registeredOn: r.registered_on || "",
+  registeredAt: r.registered_at || "",
+});
+
+// Converts an app donor object → Supabase DB row
+const toSupabaseRow = d => ({
+  id: d.id,
+  sr_no: d.srNo,
+  shraddhavana_type: d.shraddhavanaType || "",
+  upasana_kendra: d.upasanaKendra || "",
+  name: d.name || "",
+  mobile: d.mobile || "",
+  dob: d.dob || "",
+  age: d.age || "",
+  gender: d.gender || "",
+  blood_group: d.bloodGroup || "",
+  status: d.status || "",
+  rejection_reason: d.rejectionReason || "",
+  registered_on: d.registeredOn || "",
+  registered_at: d.registeredAt || "",
+});
+
+// ─── Donut slice helper ──────────────────────────────────────────────────
 const donutSlices = (data, r, cx, cy) => {
   const total = data.reduce((s, d) => s + d.val, 0) || 1;
   let offset = -0.25;
@@ -421,25 +458,17 @@ function RewardModal({ reward, onClose }) {
           </div>
 
           <div style={{
-            fontSize: 48,
-            fontWeight: "900",
+            fontSize: 48, fontWeight: "900",
             background: "linear-gradient(180deg, #FFF9C4 0%, #FFD700 45%, #D4AF37 55%, #8B4513 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            fontFamily: AF,
-            marginBottom: 2,
-            letterSpacing: 1,
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            fontFamily: AF, marginBottom: 2, letterSpacing: 1,
             filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.8))"
           }}>हरि ॐ श्रीराम</div>
           <div style={{
-            fontSize: 34,
-            fontWeight: "900",
+            fontSize: 34, fontWeight: "900",
             background: "linear-gradient(180deg, #FFF9C4 0%, #FFD700 45%, #D4AF37 55%, #8B4513 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            fontFamily: AF,
-            marginBottom: 40,
-            letterSpacing: 1,
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            fontFamily: AF, marginBottom: 40, letterSpacing: 1,
             filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.8))"
           }}>अंबज्ञ नाथसंविध</div>
 
@@ -480,10 +509,10 @@ export default function BloodDonorApp() {
   const [bannerIcon, setBannerIcon] = useState(null);
   const [sidebarIcon, setSidebarIcon] = useState(null);
   const [sidebarDecorImg, setSidebarDecorImg] = useState(null);
-  const [sidebarDecorOp, setSidebarDecorOp] = useState(0.5);   // blend opacity
-  const [sidebarDecorX, setSidebarDecorX] = useState(50);    // objectPosition X %
-  const [sidebarDecorY, setSidebarDecorY] = useState(50);    // objectPosition Y %
-  const [sidebarDecorSc, setSidebarDecorSc] = useState(100);   // scale / zoom %
+  const [sidebarDecorOp, setSidebarDecorOp] = useState(0.5);
+  const [sidebarDecorX, setSidebarDecorX] = useState(50);
+  const [sidebarDecorY, setSidebarDecorY] = useState(50);
+  const [sidebarDecorSc, setSidebarDecorSc] = useState(100);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [search, setSearch] = useState("");
   const [filterBG, setFilterBG] = useState("All");
@@ -505,7 +534,7 @@ export default function BloodDonorApp() {
   const [interact, setInteract] = useState(null);
   const [nextSrNo, setNextSrNo] = useState(1);
   const [showCelebration, setShowCelebration] = useState(false);
-  const [celebratedDonor, setCelebratedDonor] = useState(null);
+  // NOTE: celebratedDonor state removed — was assigned but never read in JSX
   const [reward, setReward] = useState(null);
   const [bkInterval, setBkInterval] = useState(15);
   const [lastBkTime, setLastBkTime] = useState(null);
@@ -516,20 +545,62 @@ export default function BloodDonorApp() {
   const fileRef = useRef();
   const autoBkRef = useRef(null);
 
-  // ── Boot ─────────────────────────────────────────────────────────────
+  // ── Always-fresh ref so backup callback never reads stale donors ──────
+  const donorsRef = useRef(donors);
+  useEffect(() => { donorsRef.current = donors; }, [donors]);
+
+  // ── Boot — load from Supabase (primary) with localStorage fallback ─────
   useEffect(() => {
     const run = async () => {
       const log = [];
       setLoadStage(0);
-      const dr = sGet(SK.DONORS);
-      if (dr) {
-        try {
-          const d = JSON.parse(dr);
-          setDonors(d);
-          if (d.length > 0) setNextSrNo(Math.max(...d.map(x => x.srNo || 0)) + 1);
-          log.push(`✅ Donors: ${d.length} record(s) restored`);
-        } catch { log.push("⚠️ Donor data corrupted"); }
-      } else { log.push("ℹ️ Fresh start — no records yet"); }
+
+      // ── Try Supabase first (source of truth) ──
+      try {
+        const { data: sbData, error: sbErr } = await supabase
+          .from('donors')
+          .select('*')
+          .order('sr_no', { ascending: true });
+
+        if (!sbErr && sbData && sbData.length > 0) {
+          const mapped = sbData.map(fromSupabaseRow);
+          setDonors(mapped);
+          setNextSrNo(Math.max(...mapped.map(x => x.srNo || 0)) + 1);
+          sSet(SK.DONORS, JSON.stringify(mapped)); // cache locally
+          log.push(`✅ Donors: ${mapped.length} record(s) loaded from Supabase`);
+        } else if (sbErr) {
+          throw new Error(sbErr.message);
+        } else {
+          // Supabase empty — check local cache
+          const dr = sGet(SK.DONORS);
+          if (dr) {
+            const d = JSON.parse(dr);
+            if (d.length > 0) {
+              setDonors(d);
+              setNextSrNo(Math.max(...d.map(x => x.srNo || 0)) + 1);
+              log.push(`✅ Donors: ${d.length} record(s) from local cache`);
+            } else {
+              log.push("ℹ️ Fresh start — no records yet");
+            }
+          } else {
+            log.push("ℹ️ Fresh start — no records yet");
+          }
+        }
+      } catch (e) {
+        // Network / Supabase offline — fall back to localStorage
+        console.warn("Supabase load failed, using localStorage:", e.message);
+        const dr = sGet(SK.DONORS);
+        if (dr) {
+          try {
+            const d = JSON.parse(dr);
+            setDonors(d);
+            if (d.length > 0) setNextSrNo(Math.max(...d.map(x => x.srNo || 0)) + 1);
+            log.push(`⚠️ Supabase offline — ${d.length} record(s) from local cache`);
+          } catch { log.push("⚠️ Donor data corrupted"); }
+        } else {
+          log.push("ℹ️ Fresh start — no records yet");
+        }
+      }
 
       setLoadStage(1);
       const gi = sGet(SK.GAL_IDX);
@@ -569,10 +640,10 @@ export default function BloodDonorApp() {
       }, 400);
     };
     run();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
 
-  // ── Real-time: auto-refresh when another user adds/edits/deletes ──────
+  // ── Real-time: auto-refresh when any device adds/edits/deletes ────────
   useEffect(() => {
     const channel = supabase
       .channel('donors-realtime')
@@ -586,23 +657,9 @@ export default function BloodDonorApp() {
             .order('sr_no', { ascending: true });
 
           if (data) {
-            const mapped = data.map(r => ({
-              id: r.id,
-              srNo: r.sr_no,
-              shraddhavanaType: r.shraddhavana_type || "",
-              upasanaKendra: r.upasana_kendra || "",
-              name: r.name || "",
-              mobile: r.mobile || "",
-              dob: r.dob || "",
-              age: r.age || "",
-              gender: r.gender || "",
-              bloodGroup: r.BLOOD_GROUPS || "",
-              status: r.status || "",
-              rejectionReason: r.rejection_reason || "",
-              registeredOn: r.registered_on || "",
-              registeredAt: r.registered_at || "",
-            }));
+            const mapped = data.map(fromSupabaseRow); // ← uses shared mapper
             setDonors(mapped);
+            sSet(SK.DONORS, JSON.stringify(mapped)); // keep local cache in sync
             if (mapped.length > 0)
               setNextSrNo(Math.max(...mapped.map(x => x.srNo || 0)) + 1);
           }
@@ -614,50 +671,60 @@ export default function BloodDonorApp() {
   }, []);
 
 
-  // ── Always-fresh ref so interval callback never reads stale donors ──
-  const donorsRef = useRef(donors);
-  useEffect(() => { donorsRef.current = donors; }, [donors]);
-  const doBackupRef = useRef(null);
-  // point doBackupRef at latest doBackup on every render
-  useEffect(() => { doBackupRef.current = doBackup; });
+  // ── doBackup — stable reference via useCallback (empty deps) ─────────
+  // Uses donorsRef so it always reads the latest donors without needing
+  // donors in the dependency array (which would reset the interval timer).
+  const doBackup = useCallback(() => {
+    const currentDonors = donorsRef.current;
+    if (!currentDonors || currentDonors.length === 0) return;
+    const ts = Date.now(), fname = bkFname();
+    const data = JSON.stringify({ donors: currentDonors, exportedAt: nowDT(), backupFile: fname, version: "1.0" }, null, 2);
+    sSet(`bdms-backup-${ts}`, data);
+    const allBk = Object.keys(localStorage).filter(k => k.startsWith("bdms-backup-")).sort();
+    while (allBk.length > 5) { sDel(allBk.shift()); }
+    setStoredBks(Object.keys(localStorage).filter(k => k.startsWith("bdms-backup-")).sort().reverse().slice(0, 5));
+    try {
+      const blob = new Blob([data], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = fname;
+      a.click();
+    } catch { }
+    setLastBkTime(nowTs());
+    setBkNotif({ fname, time: nowTs() });
+    setTimeout(() => setBkNotif(null), 8000);
+  }, []); // stable: only uses refs and stable state-setter functions
 
-  // ── Auto-backup timer ────────────────────────────────────────────────
-  // donors is NOT in dependency array — adding it would reset the timer
-  // on every donor change. Fresh data is always read via donorsRef.
+
+  // ── Auto-backup: fire once on app open + repeat at user interval ──────
+  // doBackup is stable (useCallback []) so it won't reset the timer.
+  // donorsRef is used inside the callbacks so no stale-closure risk.
   useEffect(() => {
-    // Fire one backup 5 seconds after app opens (if data exists)
-    const initial = setTimeout(() => {
-      if (donorsRef.current.length > 0 && doBackupRef.current) doBackupRef.current();
-  }, 5000);
+    // One-shot backup 5 s after app opens (if there is data)
+    const openTimer = setTimeout(() => {
+      if (donorsRef.current.length > 0) doBackup();
+    }, 5000);
 
-    // Then repeat at the user-chosen interval
+    // Recurring backup at the user-chosen interval
     if (autoBkRef.current) clearInterval(autoBkRef.current);
-    autoBkRef.current = setInterval(() => { if (donors.length > 0) doBackup(); }, bkInterval * 60 * 1000);
-    return () => { if (autoBkRef.current) clearInterval(autoBkRef.current); };
-  }, [bkInterval, donors]);
+    autoBkRef.current = setInterval(() => {
+      if (donorsRef.current.length > 0) doBackup();
+    }, bkInterval * 60 * 1000);
 
-  // ── Auto-save every 30s ──────────────────────────────────────────────
+    return () => {
+      clearTimeout(openTimer);                            // always clean up
+      if (autoBkRef.current) clearInterval(autoBkRef.current);
+    };
+  }, [bkInterval, doBackup]); // doBackup is stable so this only re-runs when interval changes
+
+
+  // ── Auto-save to localStorage every 30 s ─────────────────────────────
   useEffect(() => {
     const t = setInterval(() => {
       if (donors.length > 0) { const ok = sSet(SK.DONORS, JSON.stringify(donors)); if (ok) setLastSaved(nowTs()); }
     }, 30000);
     return () => clearInterval(t);
   }, [donors]);
-
-  const doBackup = () => {
-    const currentDonors = donorsRef.current;
-    if (!currentDonors || currentDonors.length === 0) return;
-    const ts = Date.now(), fname = bkFname();
-    const data = JSON.stringify({ donors, exportedAt: nowDT(), backupFile: fname, version: "1.0" }, null, 2);
-    sSet(`bdms-backup-${ts}`, data);
-    const allBk = Object.keys(localStorage).filter(k => k.startsWith("bdms-backup-")).sort();
-    while (allBk.length > 5) { sDel(allBk.shift()); }
-    setStoredBks(Object.keys(localStorage).filter(k => k.startsWith("bdms-backup-")).sort().reverse().slice(0, 5));
-    try { const blob = new Blob([data], { type: "application/json" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = fname; a.click(); } catch { }
-    setLastBkTime(nowTs());
-    setBkNotif({ fname, time: nowTs() });
-    setTimeout(() => setBkNotif(null), 8000);
-  };
 
   const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3800); };
 
@@ -666,7 +733,7 @@ export default function BloodDonorApp() {
     if (list.length > 0) setNextSrNo(Math.max(...list.map(x => x.srNo || 0)) + 1); else setNextSrNo(1);
     const ok = sSet(SK.DONORS, JSON.stringify(list));
     if (ok) { setSaveErr(false); setLastSaved(nowTs()); }
-    else { setSaveErr(true); showToast("⚠️ Save failed! Export a backup.", "error"); }
+    else { setSaveErr(true); showToast("⚠️ Local save failed! Export a backup.", "error"); }
   };
 
   const saveGallery = list => {
@@ -689,30 +756,51 @@ export default function BloodDonorApp() {
     return null;
   };
 
-  const handleSubmit = () => {
+  // ── handleSubmit — optimistic update + Supabase write ────────────────
+  const handleSubmit = async () => {
     const err = validate(); if (err) { showToast(err, "error"); return; }
     if (editId) {
-      saveDonors(donors.map(d => d.id === editId ? { ...form, id: editId, registeredAt: d.registeredAt, registeredOn: d.registeredOn } : d));
+      const orig = donors.find(d => d.id === editId);
+      const updated = { ...form, id: editId, registeredAt: orig?.registeredAt || nowDT(), registeredOn: orig?.registeredOn || todayStr() };
+      saveDonors(donors.map(d => d.id === editId ? updated : d));
       showToast("Record updated! ✅"); setEditId(null);
+      // ── Write to Supabase ──
+      try {
+        const { error } = await supabase.from('donors').update(toSupabaseRow(updated)).eq('id', editId);
+        if (error) showToast("⚠️ Supabase sync error: " + error.message, "error");
+      } catch (e) { console.error("Supabase update error:", e); }
     } else {
       const newDonor = { ...form, id: Date.now(), srNo: nextSrNo, registeredOn: todayStr(), registeredAt: nowDT() };
       const newList = [...donors, newDonor];
       saveDonors(newList);
-      setCelebratedDonor(newDonor);
       setShowCelebration(true);
       showToast("Shraddhavan registered! ✅");
-
-      // Check Reward
+      // Check milestone reward
       const r = REWARDS.find(x => newList.length === x.count);
       if (r) setReward(r);
-
       setTimeout(() => setShowCelebration(false), 5500);
+      // ── Write to Supabase ──
+      try {
+        const { error } = await supabase.from('donors').insert(toSupabaseRow(newDonor));
+        if (error) showToast("⚠️ Supabase sync error: " + error.message, "error");
+      } catch (e) { console.error("Supabase insert error:", e); }
     }
     setForm(INIT_FORM); setView("database");
   };
 
   const handleEdit = d => { setForm({ ...d }); setEditId(d.id); setView("add"); setActiveTab("form"); };
-  const handleDelete = id => { saveDonors(donors.filter(d => d.id !== id)); setDelConfirm(null); showToast("Record removed.", "info"); };
+
+  // ── handleDelete — optimistic update + Supabase delete ───────────────
+  const handleDelete = async id => {
+    saveDonors(donors.filter(d => d.id !== id));
+    setDelConfirm(null);
+    showToast("Record removed.", "info");
+    try {
+      const { error } = await supabase.from('donors').delete().eq('id', id);
+      if (error) showToast("⚠️ Supabase sync error: " + error.message, "error");
+    } catch (e) { console.error("Supabase delete error:", e); }
+  };
+
   const handleSort = f => { if (sortField === f) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortField(f); setSortDir("asc"); } };
 
   const exportExcel = () => {
@@ -745,15 +833,22 @@ export default function BloodDonorApp() {
     showToast("Excel downloaded — includes Summary sheet!");
   };
 
+  // ── importExcel — with Supabase bulk upsert ───────────────────────────
   const importExcel = e => {
     const f = e.target.files[0]; if (!f) return;
     const reader = new FileReader();
-    reader.onload = ev => {
+    reader.onload = async ev => {
       const wb = XLSX.read(ev.target.result, { type: "binary" });
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
       const maxSr = donors.length ? Math.max(...donors.map(x => x.srNo || 0)) : 0;
-      const imp = rows.map((r, i) => ({ id: Date.now() + i, srNo: maxSr + i + 1, shraddhavanaType: r["Type"] || "", upasanaKendra: r["Upasana Kendra"] || "", name: r["Name of Shraddhavan"] || "", mobile: r["Mobile"] || "", dob: r["Date of Birth"] || "", age: r["Age"] || "", gender: r["Gender"] || "", bloodGroup: r["Blood Group"] || "", status: r["Status"] || "", rejectionReason: r["Reason for Rejection"] || "", registeredOn: r["Registered On"] || todayStr(), registeredAt: r["Registered At"] || r["Registered On"] || nowDT() }));
-      saveDonors([...donors, ...imp]); showToast(`${imp.length} records imported!`);
+      const imp = rows.map((r, i) => ({ id: Date.now() + i, srNo: maxSr + i + 1, shraddhavanaType: r["Type"] || "", upasanaKendra: r["Upasana Kendra"] || "", name: r["Name of Shraddhavan"] || "", mobile: String(r["Mobile"] || ""), dob: r["Date of Birth"] || "", age: String(r["Age"] || ""), gender: r["Gender"] || "", bloodGroup: r["Blood Group"] || "", status: r["Status"] || "", rejectionReason: r["Reason for Rejection"] || "", registeredOn: r["Registered On"] || todayStr(), registeredAt: r["Registered At"] || r["Registered On"] || nowDT() }));
+      saveDonors([...donors, ...imp]);
+      showToast(`${imp.length} records imported!`);
+      // ── Sync to Supabase ──
+      try {
+        const { error } = await supabase.from('donors').upsert(imp.map(toSupabaseRow));
+        if (error) showToast("⚠️ Supabase sync error: " + error.message, "error");
+      } catch (e2) { console.error("Supabase import error:", e2); }
     };
     reader.readAsBinaryString(f); e.target.value = "";
   };
@@ -765,11 +860,23 @@ export default function BloodDonorApp() {
     showToast("JSON backup downloaded!");
   };
 
+  // ── importJSON — with Supabase bulk upsert ────────────────────────────
   const importJSON = e => {
     const f = e.target.files[0]; if (!f) return;
     const reader = new FileReader();
-    reader.onload = ev => {
-      try { const d = JSON.parse(ev.target.result); const list = Array.isArray(d) ? d : (d.donors || []); if (!list.length) { showToast("No records in file", "error"); return; } saveDonors(list); showToast(`${list.length} records restored!`); }
+    reader.onload = async ev => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        const list = Array.isArray(d) ? d : (d.donors || []);
+        if (!list.length) { showToast("No records in file", "error"); return; }
+        saveDonors(list);
+        showToast(`${list.length} records restored!`);
+        // ── Sync to Supabase ──
+        try {
+          const { error } = await supabase.from('donors').upsert(list.map(toSupabaseRow));
+          if (error) showToast("⚠️ Supabase sync error: " + error.message, "error");
+        } catch (e2) { console.error("Supabase restore error:", e2); }
+      }
       catch { showToast("Invalid backup file", "error"); }
     };
     reader.readAsText(f); e.target.value = "";
@@ -785,11 +892,7 @@ export default function BloodDonorApp() {
   const removeGalleryImg = id => { const u = gallery.filter(i => i.id !== id); saveGallery(u); sDel(galKey(id)); showToast("Image removed", "info"); };
 
   const handleKPIClick = (st = "All", ty = "All") => {
-    setFilterSt(st);
-    setFilterTy(ty);
-    setFilterBG("All");
-    setSearch("");
-    setView("database");
+    setFilterSt(st); setFilterTy(ty); setFilterBG("All"); setSearch(""); setView("database");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -908,26 +1011,15 @@ export default function BloodDonorApp() {
           <div style={{ fontSize: 11, color: SAF_L, letterSpacing: 3, textTransform: "uppercase", marginTop: 3, fontFamily: SF, fontWeight: "600" }}>Mega Blood Donation Camp</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: 20, flexShrink: 0 }}>
-          {/*<button onClick={() => setBgEdMode("banner")} style={{background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:9,color:"rgba(255,255,255,0.85)",cursor:"pointer",padding:"8px 12px",fontSize:12,fontFamily:SF,fontWeight:"600"}}>🎨 Banner</button>*/}
           <button onClick={() => { setForm(INIT_FORM); setEditId(null); setView("add"); setActiveTab("form"); }} style={{ ...pBtn, padding: "10px 18px" }}>+ New Shraddhavan Donor</button>
-          {/*<label style={{background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:9,color:"rgba(255,255,255,0.85)",cursor:"pointer",padding:"8px 12px",fontSize:12,fontFamily:SF,fontWeight:"600"}}>
-            🏷 Icon
-            <input type="file" accept="image/*" style={{display:"none"}} onChange={e => {
-              const f=e.target.files[0]; if(!f) return;
-              const r=new FileReader(); r.onload=ev=>{ const u=ev.target.result; setBannerIcon(u); setSidebarIcon(u); sSet(SK.BANNER_ICON,u); sSet(SK.SIDEBAR_ICON,u); showToast("Icon updated!"); }; r.readAsDataURL(f);
-            }} />
-			  </label>*/}
         </div>
       </div>
 
       {/* SIDEBAR */}
       <div style={{ position: "fixed", left: 0, top: 64, bottom: 0, width: SW, background: `linear-gradient(175deg,${SB_BG} 0%,${SB_BG2} 35%,#3F0D0D 65%,${SB_BG} 100%)`, borderRight: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", zIndex: 100, transition: "width 0.32s cubic-bezier(0.4,0,0.2,1)", overflow: "hidden", boxShadow: `4px 0 32px rgba(44,10,4,0.5)` }}>
-        {/* Glowing top accent */}
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${SAF},transparent)`, zIndex: 1 }} />
-        {/* Subtle gradient overlay */}
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 30% 20%, rgba(232,100,26,0.06) 0%,transparent 60%)`, pointerEvents: "none", zIndex: 0 }} />
 
-        {/* Logo */}
         <div style={{ padding: sidebarOpen ? "20px 18px 14px" : "12px 8px", borderBottom: "1px solid rgba(255,255,255,0.06)", position: "relative", zIndex: 1 }}>
           {sidebarOpen ? (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -971,8 +1063,6 @@ export default function BloodDonorApp() {
         </nav>
 
         <div style={{ padding: "8px", borderTop: "1px solid rgba(255,255,255,0.06)", position: "relative", zIndex: 1 }}>
-
-          {/* ── Sidebar decorative image (controls are in Settings) ── */}
           {sidebarOpen && (
             sidebarDecorImg ? (
               <div style={{ position: "relative", marginBottom: 10, borderRadius: 12, overflow: "hidden", height: 110 }}>
@@ -1010,7 +1100,6 @@ export default function BloodDonorApp() {
             )
           )}
 
-          {/* ── Autosaved indicator + author ──────────────────────── */}
           {sidebarOpen && (
             <div style={{ paddingLeft: 8, marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
@@ -1022,12 +1111,10 @@ export default function BloodDonorApp() {
             </div>
           )}
 
-          {/* ── Collapse / Expand button ──────────────────────────── */}
           <button
             onClick={() => { const n = !sidebarOpen; setSidebarOpen(n); sSet(SK.SIDEBAR_OPEN, String(n)); }}
             style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9, color: "rgba(255,255,255,0.5)", cursor: "pointer", padding: "9px", display: "flex", alignItems: "center", justifyContent: "center", gap: sidebarOpen ? 8 : 0, fontSize: 13, fontFamily: SF, transition: "all 0.2s" }}>
             <span style={{ transition: "transform 0.3s", transform: sidebarOpen ? "none" : "rotate(180deg)", lineHeight: 1 }}>◀</span>
-            {/*{sidebarOpen && <span style={{fontSize:11}}>Collapse</span>}*/}
           </button>
         </div>
       </div>
@@ -1047,7 +1134,6 @@ export default function BloodDonorApp() {
         {/* ═══ DASHBOARD ═══════════════════════════════════════════════ */}
         {view === "dashboard" && (
           <div>
-            {/* KPI row 1 */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 16 }}>
               {[
                 { label: "TOTAL DONORS", value: stats.total, color: MAR_M, iconBg: "rgba(153,27,27,0.1)", icon: "👥", onClick: () => handleKPIClick() },
@@ -1066,7 +1152,6 @@ export default function BloodDonorApp() {
                 </div>
               ))}
             </div>
-            {/* KPI row 2 */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16, marginBottom: 20 }}>
               {[
                 { label: "NEW SHRADDHAVAN", value: stats.newS, color: SAF, iconBg: SAF_XL, icon: "🆕", onClick: () => handleKPIClick("All", "New") },
@@ -1085,9 +1170,7 @@ export default function BloodDonorApp() {
               ))}
             </div>
 
-            {/* Charts */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 18, marginBottom: 20 }}>
-              {/* Blood groups */}
               <div style={{ ...card, padding: 22 }}>
                 <h3 style={{ fontSize: 13, fontWeight: "700", color: MAR, marginBottom: 14, fontFamily: AF, display: "flex", alignItems: "center", gap: 6 }}><span style={{ color: SAF }}>⬡</span> Blood Groups</h3>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -1105,7 +1188,6 @@ export default function BloodDonorApp() {
                   })}
                 </div>
               </div>
-              {/* Gender donut */}
               <div style={{ ...card, padding: 22, position: "relative" }}>
                 <h3 style={{ fontSize: 13, fontWeight: "700", color: MAR, marginBottom: 12, fontFamily: AF }}>Gender Split</h3>
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 20, position: "relative" }}>
@@ -1113,54 +1195,26 @@ export default function BloodDonorApp() {
                     <defs>
                       <filter id="glow">
                         <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
-                        <feMerge>
-                          <feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" />
-                        </feMerge>
+                        <feMerge><feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
                       </filter>
                     </defs>
-                    {/* Fast Entry Animation Slices Group */}
                     <g style={{ animation: "chartEntry 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards", transformOrigin: "60px 60px" }}>
                       {slices.map((s, i) => s.val > 0 && (
-                        <path
-                          key={i}
-                          d={s.pathD}
-                          fill={s.color}
-                          className="donut-slice"
-                          style={{
-                            opacity: hoveredGender && hoveredGender !== s.label ? 0.3 : 0.9,
-                            transform: hoveredGender === s.label ? "scale(1.1)" : "scale(1)",
-                            transformOrigin: "60px 60px",
-                            filter: hoveredGender === s.label ? "url(#glow)" : "none"
-                          }}
-                          onMouseEnter={() => setHoveredGender(s.label)}
-                          onMouseLeave={() => setHoveredGender(null)}
-                        />
+                        <path key={i} d={s.pathD} fill={s.color} className="donut-slice"
+                          style={{ opacity: hoveredGender && hoveredGender !== s.label ? 0.3 : 0.9, transform: hoveredGender === s.label ? "scale(1.1)" : "scale(1)", transformOrigin: "60px 60px", filter: hoveredGender === s.label ? "url(#glow)" : "none" }}
+                          onMouseEnter={() => setHoveredGender(s.label)} onMouseLeave={() => setHoveredGender(null)} />
                       ))}
                     </g>
-                    {/* Stable Center */}
-                    <circle cx="60" cy="60" r="32" fill={CARD_BG} style={{ boxShadow: "inset 0 2px 10px rgba(0,0,0,0.1)" }} />
-                    <circle cx="60" cy="60" r="28" fill="none" border={`1px solid ${BDR}`} stroke={BDR} strokeDasharray="2 2" />
+                    <circle cx="60" cy="60" r="32" fill={CARD_BG} />
+                    <circle cx="60" cy="60" r="28" fill="none" stroke={BDR} strokeDasharray="2 2" />
                     <text x="60" y="62" textAnchor="middle" fontSize="14" fontWeight="900" fill={MAR} fontFamily={MF} style={{ animation: "pulse 2s infinite" }}>{stats.total}</text>
                     <text x="60" y="74" textAnchor="middle" fontSize="8" fontWeight="700" fill={TX_M} fontFamily={SF} style={{ textTransform: "uppercase", letterSpacing: 1 }}>Total</text>
                   </svg>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {Object.entries(stats.byGender).map(([g, c]) => (
-                    <div
-                      key={g}
-                      onMouseEnter={() => setHoveredGender(g)}
-                      onMouseLeave={() => setHoveredGender(null)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "6px 10px",
-                        borderRadius: 8,
-                        background: hoveredGender === g ? `${GEN_C[g]}15` : "transparent",
-                        transition: "all 0.2s",
-                        cursor: "pointer"
-                      }}
-                    >
+                    <div key={g} onMouseEnter={() => setHoveredGender(g)} onMouseLeave={() => setHoveredGender(null)}
+                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: hoveredGender === g ? `${GEN_C[g]}15` : "transparent", transition: "all 0.2s", cursor: "pointer" }}>
                       <div style={{ width: 10, height: 10, borderRadius: 3, background: GEN_C[g], flexShrink: 0, boxShadow: hoveredGender === g ? `0 0 10px ${GEN_C[g]}` : "none" }} />
                       <span style={{ flex: 1, fontSize: 12, color: hoveredGender === g ? TX_P : TX_S, fontFamily: SF, fontWeight: hoveredGender === g ? "700" : "500" }}>{g}</span>
                       <span style={{ fontSize: 13, fontWeight: "700", color: GEN_C[g], fontFamily: MF }}>{c}</span>
@@ -1169,7 +1223,6 @@ export default function BloodDonorApp() {
                   ))}
                 </div>
               </div>
-              {/* Top kendras */}
               <div style={{ ...card, padding: 22 }}>
                 <h3 style={{ fontSize: 13, fontWeight: "700", color: MAR, marginBottom: 14, fontFamily: AF }}>🏛 Top Upasana Kendras</h3>
                 {stats.byKendra.length === 0
@@ -1185,7 +1238,6 @@ export default function BloodDonorApp() {
               </div>
             </div>
 
-            {/* Recent cards */}
             <div style={card}>
               <div style={{ padding: "16px 22px", borderBottom: `1px solid ${BDR}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <h3 style={{ fontSize: 14, fontWeight: "700", color: MAR, fontFamily: AF }}>Recent Shraddhavans</h3>
@@ -1432,14 +1484,13 @@ export default function BloodDonorApp() {
               </div>
             </div>
 
-            {/* ── Sidebar Image ─────────────────────────────────────── */}
+            {/* Sidebar Decorative Image */}
             <div style={{ ...card, marginBottom: 18 }}>
               <div style={{ padding: "16px 22px", borderBottom: `1px solid ${BDR}`, background: `linear-gradient(90deg,${SAF_XL}40,transparent)` }}>
                 <div style={{ fontSize: 14, fontWeight: "700", color: MAR, fontFamily: AF }}>🖼 Sidebar Decorative Image</div>
                 <div style={{ fontSize: 11, color: TX_M, marginTop: 3, fontFamily: SF }}>Upload, adjust opacity, zoom and crop — changes are saved automatically</div>
               </div>
               <div style={{ padding: 22 }}>
-                {/* Live preview */}
                 <div style={{ marginBottom: 18 }}>
                   <div style={{ fontSize: 11, color: TX_M, textTransform: "uppercase", letterSpacing: 1, fontWeight: "600", marginBottom: 8, fontFamily: SF }}>Live Preview</div>
                   <div style={{ position: "relative", height: 90, borderRadius: 10, overflow: "hidden", background: `linear-gradient(175deg,${SB_BG},${SB_BG2})`, border: `1px solid rgba(255,255,255,0.06)` }}>
@@ -1455,8 +1506,6 @@ export default function BloodDonorApp() {
                     )}
                   </div>
                 </div>
-
-                {/* Upload / Change / Remove */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
                   <label style={{ ...g2Btn, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, cursor: "pointer" }}>
                     {sidebarDecorImg ? "✎ Change Image" : "📁 Upload Image"}
@@ -1475,15 +1524,13 @@ export default function BloodDonorApp() {
                     }}>🗑 Remove Image</button>
                   )}
                 </div>
-
-                {/* Adjustment sliders — only when image is loaded */}
                 {sidebarDecorImg && (
                   <div>
                     {[
-                      { label: "Blend Opacity", val: sidebarDecorOp, min: 0.05, max: 0.95, step: 0.05, unit: "%", display: v => Math.round(v * 100) + "%", set: v => { setSidebarDecorOp(v); sSet(SK.SIDEBAR_DECOR_OP, String(v)); }, leftTip: "Very subtle", rightTip: "More visible" },
-                      { label: "Zoom / Scale", val: sidebarDecorSc, min: 100, max: 300, step: 5, unit: "%", display: v => v + "%", set: v => { setSidebarDecorSc(v); sSet(SK.SIDEBAR_DECOR_SC, String(v)); }, leftTip: "Fit (100%)", rightTip: "Zoomed (300%)" },
-                      { label: "Horizontal Position (pan / crop)", val: sidebarDecorX, min: 0, max: 100, step: 1, unit: "%", display: v => v + "%", set: v => { setSidebarDecorX(v); sSet(SK.SIDEBAR_DECOR_X, String(v)); }, leftTip: "← Left", rightTip: "Right →" },
-                      { label: "Vertical Position (pan / crop)", val: sidebarDecorY, min: 0, max: 100, step: 1, unit: "%", display: v => v + "%", set: v => { setSidebarDecorY(v); sSet(SK.SIDEBAR_DECOR_Y, String(v)); }, leftTip: "↑ Top", rightTip: "Bottom ↓" },
+                      { label: "Blend Opacity", val: sidebarDecorOp, min: 0.05, max: 0.95, step: 0.05, display: v => Math.round(v * 100) + "%", set: v => { setSidebarDecorOp(v); sSet(SK.SIDEBAR_DECOR_OP, String(v)); }, leftTip: "Very subtle", rightTip: "More visible" },
+                      { label: "Zoom / Scale", val: sidebarDecorSc, min: 100, max: 300, step: 5, display: v => v + "%", set: v => { setSidebarDecorSc(v); sSet(SK.SIDEBAR_DECOR_SC, String(v)); }, leftTip: "Fit (100%)", rightTip: "Zoomed (300%)" },
+                      { label: "Horizontal Position (pan / crop)", val: sidebarDecorX, min: 0, max: 100, step: 1, display: v => v + "%", set: v => { setSidebarDecorX(v); sSet(SK.SIDEBAR_DECOR_X, String(v)); }, leftTip: "← Left", rightTip: "Right →" },
+                      { label: "Vertical Position (pan / crop)", val: sidebarDecorY, min: 0, max: 100, step: 1, display: v => v + "%", set: v => { setSidebarDecorY(v); sSet(SK.SIDEBAR_DECOR_Y, String(v)); }, leftTip: "↑ Top", rightTip: "Bottom ↓" },
                     ].map(ctrl => (
                       <div key={ctrl.label} style={{ marginBottom: 16 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
@@ -1513,7 +1560,8 @@ export default function BloodDonorApp() {
               <div style={{ padding: "16px 22px", borderBottom: `1px solid ${BDR}`, background: `linear-gradient(90deg,${GRN_L}60,transparent)` }}><div style={{ fontSize: 14, fontWeight: "700", color: GRN, fontFamily: AF }}>💾 Auto-Backup & Restore</div></div>
               <div style={{ padding: 22 }}>
                 <div style={{ background: GRN_L, border: "1px solid rgba(5,150,105,0.2)", borderRadius: 10, padding: 14, marginBottom: 18, fontSize: 12, color: "rgb(6 78 59)", lineHeight: 1.85 }}>
-                  🔄 Auto-backup every <strong>{bkInterval} minutes</strong> · 📁 <code style={{ fontFamily: MF, fontSize: 10 }}>MBDC_Backup_YYYY-MM-DD_HH-MM.json</code><br />
+                  🔄 Auto-backup every <strong>{bkInterval} minutes</strong> · Also fires automatically when the app opens<br />
+                  📁 <code style={{ fontFamily: MF, fontSize: 10 }}>MBDC_Backup_YYYY-MM-DD_HH-MM.json</code> saved to your Downloads folder<br />
                   {lastBkTime && <>⏱ Last backup: <strong>{lastBkTime}</strong></>}
                 </div>
                 <div style={{ marginBottom: 18 }}>
@@ -1529,7 +1577,7 @@ export default function BloodDonorApp() {
                 </div>
                 {storedBks.length > 0 && (
                   <div>
-                    <div style={{ fontSize: 11, color: TX_M, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1, fontWeight: "600" }}>Stored Backups</div>
+                    <div style={{ fontSize: 11, color: TX_M, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1, fontWeight: "600" }}>Stored Backups (in localStorage)</div>
                     {storedBks.map((k, i) => {
                       const ts = parseInt(k.replace("bdms-backup-", "")); const dt = new Date(ts).toLocaleString("en-IN");
                       return (
@@ -1543,6 +1591,7 @@ export default function BloodDonorApp() {
                 )}
               </div>
             </div>
+
             {/* Data management */}
             <div style={{ ...card, marginBottom: 18 }}>
               <div style={{ padding: "16px 22px", borderBottom: `1px solid ${BDR}` }}><div style={{ fontSize: 14, fontWeight: "700", color: MAR, fontFamily: AF }}>📊 Data Management</div></div>
@@ -1565,7 +1614,14 @@ export default function BloodDonorApp() {
                       <div style={{ fontSize: 14, color: MAR, marginBottom: 6, fontWeight: "700" }}>🚨 FINAL CONFIRMATION</div>
                       <div style={{ fontSize: 12, color: RED, marginBottom: 14 }}>All {donors.length} records will be permanently deleted. CANNOT be undone!</div>
                       <div style={{ display: "flex", gap: 10 }}>
-                        <button style={{ ...dBtn, background: `linear-gradient(135deg,${MAR},${MAR_M})`, color: "#fff", border: "none" }} onClick={() => { saveDonors([]); setClearStep(0); showToast("All records deleted.", "info"); }}>🗑 DELETE ALL NOW</button>
+                        <button style={{ ...dBtn, background: `linear-gradient(135deg,${MAR},${MAR_M})`, color: "#fff", border: "none" }} onClick={async () => {
+                          saveDonors([]); setClearStep(0); showToast("All records deleted.", "info");
+                          try {
+                            // Delete all rows (where id > 0 covers all positive bigint IDs)
+                            const { error } = await supabase.from('donors').delete().gt('id', 0);
+                            if (error) showToast("⚠️ Supabase clear error: " + error.message, "error");
+                          } catch (e) { console.error("Supabase clear error:", e); }
+                        }}>🗑 DELETE ALL NOW</button>
                         <button style={g2Btn} onClick={() => setClearStep(0)}>Cancel</button>
                       </div>
                     </div>
@@ -1573,6 +1629,7 @@ export default function BloodDonorApp() {
                 </div>
               </div>
             </div>
+
             {/* Storage health */}
             <div style={{ ...card, marginBottom: 18 }}>
               <div style={{ padding: "16px 22px", borderBottom: `1px solid ${BDR}` }}><div style={{ fontSize: 14, fontWeight: "700", color: MAR, fontFamily: AF }}>🔒 Storage & Persistence</div></div>
@@ -1592,6 +1649,7 @@ export default function BloodDonorApp() {
                 </div>
               </div>
             </div>
+
             {/* App info */}
             <div style={card}>
               <div style={{ padding: "16px 22px", borderBottom: `1px solid ${BDR}` }}><div style={{ fontSize: 14, fontWeight: "700", color: MAR, fontFamily: AF }}>ℹ️ Application Info</div></div>
@@ -1601,7 +1659,7 @@ export default function BloodDonorApp() {
                 <div><strong style={{ color: MAR }}>Camp:</strong> Mega Blood Donation Camp</div>
                 <div><strong style={{ color: MAR }}>Records:</strong> {donors.length} · Next Sr.No: {nextSrNo}</div>
                 <div><strong style={{ color: MAR }}>Excel File:</strong> AADM_Shraddhavan_Donors_Data.xlsx</div>
-                <div><strong style={{ color: MAR }}>Storage:</strong> localStorage (persists across restarts)</div>
+                <div><strong style={{ color: MAR }}>Storage:</strong> Supabase (primary) + localStorage (cache/offline)</div>
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${BDR}`, fontSize: 11, color: TX_M }}>Crafted with ♥ by Swanandsinh Ashok Mahamuni & Priyaveera Hemant Khadsare</div>
               </div>
             </div>
