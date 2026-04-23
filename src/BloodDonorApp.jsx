@@ -695,8 +695,18 @@ export default function BloodDonorApp() {
       saveDonors(donors.map(d => d.id === editId ? { ...form, id: editId, registeredAt: d.registeredAt, registeredOn: d.registeredOn } : d));
       showToast("Record updated! ✅"); setEditId(null);
     } else {
-      saveDonors([...donors, { ...form, id: Date.now(), srNo: nextSrNo, registeredOn: todayStr(), registeredAt: nowDT() }]);
+      const newDonor = { ...form, id: Date.now(), srNo: nextSrNo, registeredOn: todayStr(), registeredAt: nowDT() };
+      const newList = [...donors, newDonor];
+      saveDonors(newList);
+      setCelebratedDonor(newDonor);
+      setShowCelebration(true);
       showToast("Shraddhavan registered! ✅");
+
+      // Check Reward
+      const r = REWARDS.find(x => newList.length === x.count);
+      if (r) setReward(r);
+
+      setTimeout(() => setShowCelebration(false), 5500);
     }
     setForm(INIT_FORM); setView("database");
   };
